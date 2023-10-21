@@ -1,26 +1,22 @@
 import axios from 'axios';
 
 const api = axios.create({
-	baseURL: import.meta.env.REACT_APP_API
+	baseURL: 'http://meudriver.br:99'
 });
 export const useApi = () => ({
 	validateToken: async (token: string) => {
-		// resposta falsa
-		return {
-			user: { id: 3, name: 'Clemas', email: 'clemas.web@icloud.com' }
-		};
-		//resposta que seria depois de ir na API verdadeira
-		const response = await api.post('/validate', { token });
+		api.interceptors.request.use(function (config) {
+			config.headers.Authorization = token;
+			return config;
+		});
+		const response = await api.post('/validate', { token: token });
 		return response.data;
 	},
-	signin: async (email: string, password: string) => {
-		// resposta falsa
-		return {
-			user: { id: 3, name: 'Clemas', email: 'clemas.web@icloud.com' },
-			token: '123456789'
-		};
-		//resposta que seria depois de ir na API verdadeira
-		const response = await api.post('/signin', { email, password });
+	signin: async (user_: string, password: string) => {
+		const response = await api.post('/signin', {
+			user: user_,
+			password: password
+		});
 		return response.data;
 	},
 	signout: async () => {

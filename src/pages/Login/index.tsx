@@ -6,16 +6,16 @@ export const Login = () => {
 	const auth = useContext(AuthContext);
 	const navigate = useNavigate();
 
-	const [email, setEmail] = useState('');
+	const [user_, setUser_] = useState('');
 	const [password, setPassword] = useState('');
 
-	const handleEmail = (e: ChangeEvent<HTMLInputElement>) => {
-		setEmail(e.target.value);
+	const handleUser_ = (e: ChangeEvent<HTMLInputElement>) => {
+		setUser_(e.target.value);
 	};
 
 	const handleLogin = async () => {
-		if (email && password) {
-			const isLogged = await auth.signin(email, password);
+		if (user_ && password) {
+			const isLogged = await auth.signin(user_, password);
 			if (isLogged) {
 				navigate('/private');
 			} else {
@@ -29,17 +29,24 @@ export const Login = () => {
 			<h2>Login</h2>
 			<input
 				type="text"
-				value={email}
-				placeholder="E-mail"
-				onChange={handleEmail}
+				value={user_}
+				placeholder="User"
+				onChange={handleUser_}
+				style={{ padding: '10px', outline: 'none' }}
 			/>
 			<input
 				type="password"
 				value={password}
 				placeholder="Senha"
 				onChange={(e) => setPassword(e.target.value)}
+				style={{ padding: '10px', outline: 'none' }}
 			/>
-			<input type="button" value="Entrar" onClick={handleLogin} />
+			<input
+				type="button"
+				value="Entrar"
+				onClick={handleLogin}
+				style={{ padding: '10px' }}
+			/>
 		</div>
 	);
 };
