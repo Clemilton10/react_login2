@@ -21,7 +21,7 @@ function App() {
 					<nav>
 						<Link to="/">Home</Link>
 						<Link to="/private">Private</Link>
-						{auth.user && (
+						{auth.user_ && (
 							<a href="#" onClick={handleSignOut}>
 								Sair
 							</a>

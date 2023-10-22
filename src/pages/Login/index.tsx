@@ -1,4 +1,4 @@
-import { ChangeEvent, useContext, useState } from 'react';
+import { ChangeEvent, useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../../contexts/Auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
@@ -13,6 +13,17 @@ export const Login = () => {
 		setUser_(e.target.value);
 	};
 
+	useEffect(() => {
+		if (auth.user_?.user_) {
+			setUser_(auth.user_.user_);
+		} else {
+			const vuser_ = localStorage.getItem('user');
+			if (vuser_) {
+				setUser_(vuser_);
+			}
+		}
+	}, []);
+
 	const handleLogin = async () => {
 		if (user_ && password) {
 			const isLogged = await auth.signin(user_, password);
@@ -25,28 +36,21 @@ export const Login = () => {
 	};
 
 	return (
-		<div>
+		<div className="content">
 			<h2>Login</h2>
 			<input
 				type="text"
 				value={user_}
 				placeholder="User"
 				onChange={handleUser_}
-				style={{ padding: '10px', outline: 'none' }}
 			/>
 			<input
 				type="password"
 				value={password}
 				placeholder="Senha"
 				onChange={(e) => setPassword(e.target.value)}
-				style={{ padding: '10px', outline: 'none' }}
 			/>
-			<input
-				type="button"
-				value="Entrar"
-				onClick={handleLogin}
-				style={{ padding: '10px' }}
-			/>
+			<input type="button" value="Entrar" onClick={handleLogin} />
 		</div>
 	);
 };

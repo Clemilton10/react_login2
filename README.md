@@ -104,8 +104,9 @@ const sha1 = require('sha1');
 const md5 = require('md5');
 const jwt = require('jsonwebtoken');
 function bin2hex(bin) {
-	return new Buffer(bin).toString('hex');
+	return Buffer.from(bin).toString('hex');
 }
+
 // Server Express
 const app = express();
 var bodyParser = require('body-parser');
@@ -124,7 +125,7 @@ const MySQL = {
 	data: {
 		host: 'localhost',
 		user: 'root',
-		password: '******',
+		password: '277908',
 		database: 'mysql_server',
 		waitForConnections: true,
 		connectionLimit: 100,
@@ -201,51 +202,72 @@ const MySQL = {
 		});
 	},
 	createToken: async (id, time) => {
+		let t = sha1(md5(new Date().getTime()));
 		let hash = jwt.sign({ id: id }, '@rangel#', {
-			expiresIn: '10m'
+			expiresIn: time
 		});
-		let r = await MySQL.exec('UPDATE `users` SET `hash`=? WHERE `id`=?', [
+		await MySQL.exec('UPDATE `users` SET `hash`=? WHERE `id`=?', [
 			hash,
 			id
 		]);
 		return hash;
 	},
-	getHash: (req) => {
-		let hash = req.header('authorization');
+	getTokenHash: (req) => {
+		let hash;
+		try {
+			hash = req.header('Authorization');
+			hash = hash.replace('Bearer ', '').trim();
+		} catch (er) {
+			return null;
+		}
 		if (hash) {
 			return hash;
 		}
-		return '+++';
-	},
-	getToken: (req) => {
-		let hash = req.header('authorization');
-		if (hash) {
-			try {
-				let tk = jwt.verify(hash, '@rangel#');
-				return tk;
-			} catch (er) {
-				return null;
-			}
-		}
 		return null;
 	},
+	getTokenId: (req) => {
+		let hash = MySQL.getTokenHash(req);
+		//const j = JSON.parse(atob(hash.split('.')[1]));
+		//const j2 = JSON.parse(atob(hash.split('.')[0]));
+		//const j3 = JSON.parse(atob(hash.split('.')[2]));
+		//const exp = Date.now() >= j.exp * 1000;
+		if (hash) {
+			let tk;
+			try {
+				tk = jwt.verify(hash, '@rangel#');
+			} catch (err) {
+				// expirado
+				if (err.name == 'TokenExpiredError') {
+					return -1;
+				} else {
+					return -1;
+				}
+			}
+			if (tk && tk.id) {
+				return tk.id;
+			} else {
+				return -1;
+			}
+		}
+		return -1;
+	},
 	verifyToken: async (req, res, next) => {
-		let hs = MySQL.getHash(req);
-		let tk = MySQL.getToken(req);
+		let hs = MySQL.getTokenHash(req);
+		let tkid = MySQL.getTokenId(req);
 
 		// caso o token não seja validado
-		if (!tk) {
+		if (tkid == -1) {
 			return res
 				.status(403)
 				.json({ status_id: -3, status: 'Token inválido' });
 		} else {
 			let r = await MySQL.get(
 				'SELECT `id` FROM `users` WHERE `id`=? AND `hash`=?',
-				[tk.id, hs]
+				[tkid, hs]
 			);
 			//error
 			if (r.status_id < 0) {
-				tk = MySQL.createToken(tk.id, '0s');
+				tk = MySQL.createToken(tkid, '0s');
 				return res
 					.status(403)
 					.json({ status_id: -3, status: 'Token inválido' });
@@ -253,21 +275,20 @@ const MySQL = {
 			} else {
 				//not found user with password
 				if (r.rows.length <= 0) {
-					tk = MySQL.createToken(tk.id, '0s');
+					tk = MySQL.createToken(tkid, '0s');
 					return res
 						.status(403)
 						.json({ status_id: -3, status: 'Token inválido' });
 				}
 			}
 		}
-
-		// Continuar para a próxima rota se o token for válido
 		next();
 	}
 };
 
 app.post('/signin', async (req, res) => {
 	let { user, password } = await req.body;
+	user = user.toUpperCase().trim();
 	password = sha1(md5(bin2hex(password)));
 
 	let r = await MySQL.get(
@@ -277,6 +298,7 @@ app.post('/signin', async (req, res) => {
 	//error
 	if (r.status_id < 0) {
 		res.json(r);
+		return;
 		//not error
 	} else {
 		//not found user with password
@@ -289,17 +311,19 @@ app.post('/signin', async (req, res) => {
 			//error
 			if (ru.status_id < 0) {
 				res.json(r);
+				return;
 				//not error
 			} else {
 				//not found user
 				if (ru.rows.length <= 0) {
-					return res.json({
+					res.json({
 						status_id: -1,
 						status: 'Usuário inválido'
 					});
+					return;
 					//found user and not password
 				} else {
-					return res.json({
+					res.json({
 						status_id: -1,
 						status: 'Senha inválida'
 					});
@@ -309,10 +333,11 @@ app.post('/signin', async (req, res) => {
 			//found user with password
 		} else {
 			let tk = await MySQL.createToken(r.rows[0].id, '10m');
-			return res.json({
+			res.json({
 				status_id: 1,
 				status: 'success',
 				token: tk,
+				id: r.rows[0].id,
 				user: user,
 				password: password
 			});
@@ -321,13 +346,14 @@ app.post('/signin', async (req, res) => {
 });
 
 app.post('/validate', async (req, res) => {
-	let hs = MySQL.getHash(req);
-	let tk = MySQL.getToken(req);
-	if (tk) {
-		let r = await MySQL.get('SELECT * FROM `users` WHERE `id`=?', [tk.id]);
+	let hs = MySQL.getTokenHash(req);
+	let tkid = MySQL.getTokenId(req);
+	if (tkid > -1) {
+		let r = await MySQL.get('SELECT * FROM `users` WHERE `id`=?', [tkid]);
 		//error
 		if (r.status_id < 0) {
 			res.json(r);
+			return;
 			//not error
 		} else {
 			//not found user with password
@@ -335,6 +361,7 @@ app.post('/validate', async (req, res) => {
 				res.json({
 					status_id: 1,
 					status: 'success',
+					id: r.rows[0].id,
 					user: r.rows[0].user,
 					password: r.rows[0].password,
 					token: hs
@@ -346,15 +373,28 @@ app.post('/validate', async (req, res) => {
 	res.json({ status_id: -1, status: 'error' });
 });
 
-app.get('/signout', MySQL.verifyToken, async (req, res) => {
-	let tk = MySQL.getToken(req);
-	if (tk) {
-		let r = await MySQL.exec('UPDATE `users` SET `hash`=? WHERE `id`=?', [
-			'---',
-			tk.id
+app.post('/signout', async (req, res) => {
+	let tkid = MySQL.getTokenId(req);
+	if (tkid > -1) {
+		await MySQL.exec('UPDATE `users` SET `hash`=? WHERE `id`=?', [
+			'',
+			tkid
 		]);
+		res.json({ status_id: 1, status: 'success' });
+		return;
+	} else {
+		let { id } = await req.body;
+		if (id) {
+			await MySQL.exec('UPDATE `users` SET `hash`=? WHERE `id`=?', [
+				'',
+				id
+			]);
+			res.json({ status_id: 1, status: 'success' });
+			return;
+		}
 	}
-	res.json({ status_id: 1, status: 'success' });
+	res.json({ status_id: -1, status: 'error' });
+	return;
 });
 
 app.get('/', MySQL.verifyToken, async (req, res) => {
@@ -362,35 +402,41 @@ app.get('/', MySQL.verifyToken, async (req, res) => {
 		'SELECT `id`,`user` FROM `users` ORDER BY `user` ASC'
 	);
 	res.json(r);
+	return;
 });
 
 app.post('/user', MySQL.verifyToken, async (req, res) => {
 	let { user, password } = req.body;
 	password = sha1(md5(bin2hex(password)));
-	let r = await MySQL.exec(
-		'INSERT INTO `users` (`user`,`passwd`) VALUES (?, ?)',
-		[user, password]
-	);
+	await MySQL.exec('INSERT INTO `users` (`user`,`passwd`) VALUES (?, ?)', [
+		user,
+		password
+	]);
 	res.json(r);
+	return;
 });
 
 app.put('/user', async (req, res) => {
 	let { id, user, password } = req.body;
 	password = sha1(md5(bin2hex(password)));
-	let r = await MySQL.exec(
-		'UPDATE `users` SET `user`=?,`passwd`=? WHERE `id`=?',
-		[user, password, id]
-	);
+	await MySQL.exec('UPDATE `users` SET `user`=?,`passwd`=? WHERE `id`=?', [
+		user,
+		password,
+		id
+	]);
 	res.json(r);
+	return;
 });
 
 app.delete('/user', MySQL.verifyToken, async (req, res) => {
 	let { id } = req.body;
-	let r = await MySQL.exec('DELETE FROM `users` WHERE `id`=?', [id]);
+	await MySQL.exec('DELETE FROM `users` WHERE `id`=?', [id]);
 	res.json(r);
+	return;
 });
 
 app.listen(99, () => {
 	console.log('rodando na porta 99');
+	return;
 });
 ```
