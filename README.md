@@ -4,6 +4,8 @@ Site da API
 
 [https://reqres.in/](https://reqres.in/)
 
+## instalação servidor Vite
+
 ```sh
 # Criar Pasta do projeto
 yarn create vite login2 --template react-ts
@@ -27,7 +29,33 @@ yarn add -D @types/react-router-dom
 yarn add -D @types/node
 ```
 
-mysql_server.sql
+## Instalador Servidor Node
+
+```sh
+# Criar servidor
+mkdir mysql_server
+cd mysql_server
+
+npm init
+npm install
+
+# Instalar pacotes necessários
+npm install -g nodemon
+npm install -D express
+npm install -D cors
+npm install -D jsonwebtoken
+npm install -D mysql
+npm install -D sha1
+npm install -D md5
+npm install -D basic-ftp
+npm install -D ftp
+
+# Rodar o servidor
+node mysql_server.js
+nodemon mysql_server.js localhost 99
+```
+
+### mysql_server.sql
 
 ```sql
 DROP DATABASE IF EXISTS `mysql_server`;
@@ -52,8 +80,26 @@ CREATE TABLE
         `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
         `user` VARCHAR(255) NOT NULL UNIQUE,
         `passwd` VARCHAR(255) NOT NULL,
-        `hash` VARCHAR(1024) NOT NULL
+        `hash` VARCHAR(1024) NOT NULL,
+        `dt_registration` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+        `dt_update` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        `publisher_id` BIGINT NOT NULL DEFAULT 1
     ) ENGINE = InnoDB DEFAULT CHARSET = utf8mb4 COLLATE = utf8mb4_general_ci;
+
+DELIMITER $$
+CREATE TRIGGER `tg_users_insert` BEFORE INSERT ON `users`
+FOR EACH ROW BEGIN
+	SET NEW.`dt_registration` = NOW();
+	SET NEW.`dt_update` = now();
+	END $$
+DELIMITER ;
+
+DELIMITER $$
+CREATE TRIGGER `tg_users_update` BEFORE UPDATE ON `users`
+FOR EACH ROW BEGIN
+	SET NEW.`dt_update` = NOW();
+	end $$
+DELIMITER ;
 
 INSERT INTO
     `users`(`id`, `user`, `passwd`)
@@ -83,12 +129,15 @@ VALUES (
         '62d7e220e8b67e3ad92548bd9aa7822f2bbea5b2'
     );
 
+ALTER TABLE `users`
+	ADD CONSTRAINT fk_users_publisher FOREIGN KEY (`publisher_id`) REFERENCES `users` (`id`);
+
 COMMIT;
 
 SET FOREIGN_KEY_CHECKS=1;
 ```
 
-mysql_server.js
+### mysql_server.js
 
 ```js
 import { createRequire } from 'module';
@@ -125,7 +174,7 @@ const MySQL = {
 	data: {
 		host: 'localhost',
 		user: 'root',
-		password: '******',
+		password: '277908',
 		database: 'mysql_server',
 		waitForConnections: true,
 		connectionLimit: 100,
@@ -431,22 +480,78 @@ app.post('/signout', async (req, res) => {
 	return;
 });
 
-app.get('/', MySQL.verifyToken, async (req, res) => {
-	let r = await MySQL.get(
-		'SELECT `id`,`user` FROM `users` ORDER BY `user` ASC'
-	);
+app.post('/user/get', MySQL.verifyToken, async (req, res) => {
+	let { fields, search, dt_ini, dt_fin, order, meaning, limit } =
+		await req.body;
+	let params = [];
+	let wh = [];
+	let sc = '';
+	if (search) {
+		let s = search;
+		while (s.indexOf(' ') > -1) {
+			s = s.replace(' ', '%');
+		}
+		sc = `%${s}%`;
+		wh.push(`\`user\` LIKE ?`);
+		params.push(sc);
+	}
+	let di = '';
+	let df = '';
+	if (dt_ini && dt_fin) {
+		let e = dt_ini.split('/');
+		di = `${e[2]}-${e[1]}-${e[0]}T00:00:00`;
+		e = dt_fin.split('/');
+		df = `${e[2]}-${e[1]}-${e[0]}T23:59:59`;
+		wh.push(`\`dt_registration\`>=?`);
+		wh.push(`\`dt_update\`<=?`);
+		params.push(di);
+		params.push(df);
+	}
+	let where = '';
+	if (wh.length > 0) {
+		where = 'WHERE ' + wh.join(' AND ');
+	}
+	let q;
+	try {
+		q = await MySQL.get(
+			`SELECT COUNT(\`id\`) as \`qtd\` FROM \`users\` ${where}`,
+			params
+		);
+	} catch (er) {
+		q = er;
+	}
+	let lt = '';
+	if (limit) {
+		lt = `LIMIT ${limit}`;
+	}
+	let r;
+	try {
+		r = await MySQL.get(
+			`SELECT ${fields} FROM \`users\` ${where} ORDER BY ${order} ${meaning} ${lt}`,
+			params
+		);
+	} catch (er) {
+		r = er;
+	}
+	let qtd = 0;
+	if (q && q.rows && q.rows.length > 0 && q.rows[0].qtd) {
+		qtd = q.rows[0].qtd;
+	}
+	r.qtd = qtd;
 	res.json(r);
 	return;
 });
 
+// User - Add
 app.post('/user', MySQL.verifyToken, async (req, res) => {
-	let { user, password } = await req.body;
+	let { user, password, publisher_id } = await req.body;
+	user = user.toUpperCase().trim();
 	password = sha1(md5(bin2hex(password)));
 	let q;
 	try {
 		q = await MySQL.exec(
-			'INSERT INTO `users` (`user`,`passwd`,`hash`) VALUES (?,?,?)',
-			[user, password, '']
+			'INSERT INTO `users` (`user`,`passwd`,`hash`,`publisher_id`) VALUES (?,?,?,?)',
+			[user, password, '', publisher_id]
 		);
 	} catch (er) {
 		q = er;
@@ -455,22 +560,40 @@ app.post('/user', MySQL.verifyToken, async (req, res) => {
 	return;
 });
 
+// User - Edit
 app.put('/user', async (req, res) => {
-	let { id, user, password } = req.body;
-	password = sha1(md5(bin2hex(password)));
-	await MySQL.exec('UPDATE `users` SET `user`=?,`passwd`=? WHERE `id`=?', [
-		user,
-		password,
-		id
-	]);
-	res.json(r);
+	let { id, user, password, publisher_id } = await req.body;
+	user = user.toUpperCase().trim();
+	let ps = '';
+	let params = [user, publisher_id];
+	if (password) {
+		password = sha1(md5(bin2hex(password)));
+		ps = `,\`passwd\`=?`;
+		params.push(password);
+	}
+	params.push(id);
+	let q;
+	try {
+		q = await MySQL.exec(
+			`UPDATE \`users\` SET \`user\`=?,\`publisher_id\`=?${ps} WHERE \`id\`=?`,
+			params
+		);
+	} catch (er) {
+		q = er;
+	}
+	res.json(q);
 	return;
 });
 
-app.delete('/user', MySQL.verifyToken, async (req, res) => {
-	let { id } = req.body;
-	await MySQL.exec('DELETE FROM `users` WHERE `id`=?', [id]);
-	res.json(r);
+app.delete('/user/:id', MySQL.verifyToken, async (req, res) => {
+	const id = req.params.id;
+	let q;
+	try {
+		q = await MySQL.exec('DELETE FROM `users` WHERE `id`=?', [id]);
+	} catch (er) {
+		q = er;
+	}
+	res.json(q);
 	return;
 });
 

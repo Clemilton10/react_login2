@@ -23,7 +23,37 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 		}
 	};
 	const userAdd = async (vuser_: string, vpassword: string) => {
-		const data = await api.userAdd(vuser_, vpassword);
+		const id = localStorage.getItem('id');
+		const data = await api.userAdd(vuser_, vpassword, Number(id));
+		return data;
+	};
+	const userEdi = async (vid: number, vuser_: string, vpassword: string) => {
+		const id = localStorage.getItem('id');
+		const data = await api.userEdi(vid, vuser_, vpassword, Number(id));
+		return data;
+	};
+	const userDel = async (vid: number) => {
+		const data = await api.userDel(vid);
+		return data;
+	};
+	const userGet = async (
+		fields: string,
+		search: string,
+		dt_ini: string,
+		dt_fin: string,
+		order: string,
+		meaning: string,
+		limit: string
+	) => {
+		const data = await api.userGet(
+			fields,
+			search,
+			dt_ini,
+			dt_fin,
+			order,
+			meaning,
+			limit
+		);
 		return data;
 	};
 	const signout = async () => {
@@ -58,7 +88,17 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 		validadeToken();
 	}, []);
 	return (
-		<AuthContext.Provider value={{ user_, signin, userAdd, signout }}>
+		<AuthContext.Provider
+			value={{
+				user_,
+				signin,
+				userAdd,
+				userEdi,
+				userDel,
+				userGet,
+				signout
+			}}
+		>
 			{children}
 		</AuthContext.Provider>
 	);

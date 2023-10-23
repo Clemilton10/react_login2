@@ -68,20 +68,21 @@ button:focus-visible {
 	gap: 10px;
 }
 
-input {
+input, select, option {
 	font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 	font-size: 14px;
 	font-weight: bold;
+	height: 50px;
 	line-height: 50px;
 	text-align: center;
 	border-radius: 6px;
+	outline: none;
 }
 
 input[type='text'],
 input[type='password'] {
 	background-color: var(--inp_text_bg);
 	color: var(--inp_text_ft);
-	outline: none;
 }
 
 input[type='button'] {
@@ -100,6 +101,18 @@ input[type='button']:active {
 	background-color: var(--button_ft);
 	color: var(--button_bg);
 	border: 2px solid var(--button_ft);
+}
+
+.table td {
+	cursor: pointer;
+}
+
+.table td.delete {
+	width: 40px;
+}
+
+.table td.edit {
+	width: 40px;
 }
 
 @media (prefers-color-scheme: light) {
