@@ -22,6 +22,10 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 			return false;
 		}
 	};
+	const userAdd = async (vuser_: string, vpassword: string) => {
+		const data = await api.userAdd(vuser_, vpassword);
+		return data;
+	};
 	const signout = async () => {
 		await api.signout();
 		clearToken();
@@ -54,7 +58,7 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 		validadeToken();
 	}, []);
 	return (
-		<AuthContext.Provider value={{ user_, signin, signout }}>
+		<AuthContext.Provider value={{ user_, signin, userAdd, signout }}>
 			{children}
 		</AuthContext.Provider>
 	);

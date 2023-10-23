@@ -46,5 +46,16 @@ export const useApi = () => ({
 		});*/
 		api.defaults.headers.common['Authorization'] = '';
 		return response.data;
+	},
+	userAdd: async (user_: string, password: string) => {
+		const response = await api.post('/user', {
+			user: user_,
+			password: password
+		});
+		/*api.interceptors.request.use(function (config) {
+			config.headers.Authorization = '';
+			return config;
+		});*/
+		return response.data;
 	}
 });

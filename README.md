@@ -125,7 +125,7 @@ const MySQL = {
 	data: {
 		host: 'localhost',
 		user: 'root',
-		password: '277908',
+		password: '******',
 		database: 'mysql_server',
 		waitForConnections: true,
 		connectionLimit: 100,
@@ -133,72 +133,106 @@ const MySQL = {
 	},
 	exec: async (sql, params) => {
 		const db = mysql.createConnection(MySQL.data);
-		db.connect((err) => {
-			if (err) {
-				return {
-					status_id: -1,
-					status: 'Erro ao conectar ao banco',
-					error: err
-				};
-			}
-		});
-		return new Promise(function (resolve, reject) {
-			db.query(sql, params, function (error) {
-				if (error) {
-					reject({
-						status_id: -2,
-						status: 'Erro ao executar',
-						error: error
-					});
-					return;
-				} else {
-					resolve({
-						status_id: 1,
-						status: 'success',
-						id: this.lastID
-					});
-					return;
+		try {
+			db.connect((err) => {
+				if (err) {
+					return {
+						status_id: -1,
+						status: 'Erro ao conectar ao banco',
+						error: err
+					};
 				}
 			});
+		} catch (er) {
+			return {
+				status_id: -1,
+				status: 'Erro ao conectar ao banco',
+				error: er
+			};
+		}
+		return new Promise(function (resolve, reject) {
+			try {
+				db.query(sql, params, function (error) {
+					if (error) {
+						reject({
+							status_id: -2,
+							status: 'Erro ao executar',
+							error: error
+						});
+						return;
+					} else {
+						resolve({
+							status_id: 1,
+							status: 'success',
+							id: this.lastID
+						});
+						return;
+					}
+				});
+			} catch (er) {
+				reject({
+					status_id: -2,
+					status: 'Erro ao executar',
+					error: error
+				});
+				return;
+			}
 		});
 	},
 	get: async (sql, params) => {
 		const db = mysql.createConnection(MySQL.data);
-		db.connect((err) => {
-			if (err) {
-				return {
-					status_id: -1,
-					status: 'Erro ao conectar ao banco',
-					error: err
-				};
-			}
-		});
-		return new Promise(function (resolve, reject) {
-			db.query(sql, params, (err, results, fields) => {
+		try {
+			db.connect((err) => {
 				if (err) {
-					reject({
-						status_id: -2,
-						status: 'Erro ao buscar',
+					return {
+						status_id: -1,
+						status: 'Erro ao conectar ao banco',
 						error: err
-					});
-					return;
-				} else {
-					if (results === undefined) {
-						reject('undefined');
-						return;
-					} else {
-						let rows = Object.values(
-							JSON.parse(JSON.stringify(results))
-						);
-						resolve({
-							status_id: 1,
-							status: 'success',
-							rows: rows
-						});
-						return;
-					}
+					};
 				}
 			});
+		} catch (er) {
+			return {
+				status_id: -1,
+				status: 'Erro ao conectar ao banco',
+				error: er
+			};
+		}
+		return new Promise(function (resolve, reject) {
+			try {
+				db.query(sql, params, (err, results, fields) => {
+					if (err) {
+						reject({
+							status_id: -2,
+							status: 'Erro ao buscar',
+							error: err
+						});
+						return;
+					} else {
+						if (results === undefined) {
+							reject('undefined');
+							return;
+						} else {
+							let rows = Object.values(
+								JSON.parse(JSON.stringify(results))
+							);
+							resolve({
+								status_id: 1,
+								status: 'success',
+								rows: rows
+							});
+							return;
+						}
+					}
+				});
+			} catch (er) {
+				reject({
+					status_id: -2,
+					status: 'Erro ao buscar',
+					error: err
+				});
+				return;
+			}
 		});
 	},
 	createToken: async (id, time) => {
@@ -257,9 +291,8 @@ const MySQL = {
 
 		// caso o token não seja validado
 		if (tkid == -1) {
-			return res
-				.status(403)
-				.json({ status_id: -3, status: 'Token inválido' });
+			res.json({ status_id: -3, status: 'Token inválido' });
+			return;
 		} else {
 			let r = await MySQL.get(
 				'SELECT `id` FROM `users` WHERE `id`=? AND `hash`=?',
@@ -268,17 +301,18 @@ const MySQL = {
 			//error
 			if (r.status_id < 0) {
 				tk = MySQL.createToken(tkid, '0s');
-				return res
-					.status(403)
-					.json({ status_id: -3, status: 'Token inválido' });
+				res.json({ status_id: -3, status: 'Token inválido' });
+				return;
 				//not error
 			} else {
 				//not found user with password
 				if (r.rows.length <= 0) {
 					tk = MySQL.createToken(tkid, '0s');
-					return res
-						.status(403)
-						.json({ status_id: -3, status: 'Token inválido' });
+					res.json({
+						status_id: -3,
+						status: 'Token inválido'
+					});
+					return;
 				}
 			}
 		}
@@ -406,13 +440,18 @@ app.get('/', MySQL.verifyToken, async (req, res) => {
 });
 
 app.post('/user', MySQL.verifyToken, async (req, res) => {
-	let { user, password } = req.body;
+	let { user, password } = await req.body;
 	password = sha1(md5(bin2hex(password)));
-	await MySQL.exec('INSERT INTO `users` (`user`,`passwd`) VALUES (?, ?)', [
-		user,
-		password
-	]);
-	res.json(r);
+	let q;
+	try {
+		q = await MySQL.exec(
+			'INSERT INTO `users` (`user`,`passwd`,`hash`) VALUES (?,?,?)',
+			[user, password, '']
+		);
+	} catch (er) {
+		q = er;
+	}
+	res.json(q);
 	return;
 });
 
