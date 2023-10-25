@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useState } from 'react';
 import { AuthContext } from './AuthContext';
 import { Data, User } from '../../types/User';
 import { useApi } from '../../hooks/useApi';
@@ -80,9 +80,9 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 		localStorage.removeItem('authToken');
 		localStorage.removeItem('id');
 	};
-	useEffect(() => {
-		const start = async () => {
-			const validadeToken = async (): Promise<boolean> => {
+	const startToken = async () => {
+		const validadeToken = async () => {
+			try {
 				const tk = localStorage.getItem('authToken');
 				if (tk) {
 					const data: Data = await api.validateToken(tk);
@@ -95,27 +95,32 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 					}
 				}
 				return false;
-			};
-			const renewToken = async (): Promise<boolean> => {
+			} catch (er) {
+				return false;
+			}
+		};
+		const renewToken = async () => {
+			try {
 				const tk = localStorage.getItem('authToken');
 				const id = localStorage.getItem('id');
 				if (tk) {
 					if (!isNaN(Number(id))) {
 						const data: Data = await api.renewToken(tk, Number(id));
 						if (data && data.status_id == 1 && data.user) {
-							setTimeout(renewToken, 10000);
+							setTimeout(renewToken, 15000);
 							return true;
 						}
 					}
 				}
 				return false;
-			};
-			let t = await validadeToken();
-			t = await renewToken();
-			return true;
+			} catch (er) {
+				return false;
+			}
 		};
-		let s = start();
-	}, []);
+		let t = await validadeToken();
+		t = await renewToken();
+		return true;
+	};
 	return (
 		<AuthContext.Provider
 			value={{
@@ -125,7 +130,8 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 				userEdi,
 				userDel,
 				userGet,
-				signout
+				signout,
+				startToken
 			}}
 		>
 			{children}

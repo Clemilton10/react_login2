@@ -12,4 +12,5 @@ export type Data = {
 	user?: string;
 	rows?: object;
 	error?: string;
+	qtd?: number;
 };

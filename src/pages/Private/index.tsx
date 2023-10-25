@@ -1,9 +1,10 @@
-import { useContext, useState } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import { AuthContext } from '../../contexts/Auth/AuthContext';
 import { Data } from '../../types/User';
 
 const Private = () => {
 	const auth = useContext(AuthContext);
+	const initialized = useRef(false);
 
 	const [action, setAction] = useState('save');
 	const [label, setLabel] = useState('Adicionar');
@@ -16,6 +17,9 @@ const Private = () => {
 	const [order, setOrder] = useState('id');
 	const [meaning, setMeaning] = useState('ASC');
 	const [user_list, setUserList] = useState<any>([]);
+	const [qtdPages, setQtdPages] = useState<number>(1);
+	const [pg, setPg] = useState<number>(1);
+	const pgx = useRef();
 	const orders = [
 		'id',
 		'user',
@@ -25,7 +29,67 @@ const Private = () => {
 	];
 	const meanings = ['ASC', 'DESC'];
 
+	const strNumber = (n: any) => {
+		if (!n || n == '' || isNaN(n)) {
+			n = 0;
+		} else {
+			if (typeof n === 'string') {
+				n = Number(n);
+			}
+		}
+		return n;
+	};
+	const isInt = (n: any) => {
+		n = strNumber(n);
+		return Math.round(n) == n;
+	};
+	const isFloat = (n: any) => {
+		n = strNumber(n);
+		return Math.round(n) != n;
+	};
+	const sleep = (tp: number) => {
+		return new Promise((resolve) => setTimeout(resolve, tp));
+	};
+	const handlePrevious = () => {
+		let p = pg - 1;
+		if (p < 1) {
+			p = 1;
+		}
+		setPg(p);
+		handleSearch();
+	};
+	const handleNext = async () => {
+		let p = pg + 1;
+		if (p > qtdPages) {
+			p = qtdPages;
+		}
+		setPg(p);
+		handleSearch();
+	};
+	const handleFisrt = () => {
+		setPg(1);
+		handleSearch();
+	};
+	const handleLast = () => {
+		setPg(qtdPages);
+		handleSearch();
+	};
+	const handlePgText = (e: any) => {
+		let p = strNumber(e.target.value);
+		if (p < 1) {
+			p = 1;
+		}
+		if (p > qtdPages) {
+			p = qtdPages;
+		}
+		setPg(p);
+		handleSearch();
+	};
+
 	const handleSearch = async () => {
+		await sleep(100);
+		let p = strNumber(pgx.current.value);
+		const limit = `${(p - 1) * 10},10`;
 		const r: Data = await auth.userGet(
 			'`id`,`user`,`dt_registration`,`dt_update`,`publisher_id`',
 			search,
@@ -33,7 +97,7 @@ const Private = () => {
 			dt_fin,
 			`\`${order}\``,
 			meaning,
-			''
+			limit
 		);
 		if (r && r.status_id) {
 			if (r.status_id < 0) {
@@ -43,6 +107,12 @@ const Private = () => {
 					alert('Houve algum erro');
 				}
 			} else {
+				r.qtd = strNumber(r.qtd);
+				let dv = r.qtd / 10;
+				if (isFloat(dv)) {
+					dv = Math.floor(dv) + 1;
+				}
+				setQtdPages(dv);
 				setUserList(r.rows);
 			}
 		} else {
@@ -106,6 +176,12 @@ const Private = () => {
 		setUser_(user_list[x].user);
 		setPassword('');
 	};
+	useEffect(() => {
+		if (!initialized.current) {
+			initialized.current = true;
+			auth.startToken();
+		}
+	}, []);
 
 	return (
 		<>
@@ -208,6 +284,20 @@ const Private = () => {
 					))}
 				</tbody>
 			</table>
+			<div className="pagination">
+				<input type="button" value="|<<" onClick={handleFisrt} />
+				<input type="button" value="<<" onClick={handlePrevious} />
+				<input
+					ref={pgx}
+					type="text"
+					placeholder="Pg"
+					value={pg}
+					onChange={(e: any) => handlePgText(e)}
+				/>
+				<input type="button" value={qtdPages} />
+				<input type="button" value=">>" onClick={handleNext} />
+				<input type="button" value=">>|" onClick={handleLast} />
+			</div>
 		</>
 	);
 };

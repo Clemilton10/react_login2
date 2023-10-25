@@ -115,6 +115,15 @@ input[type='button']:active {
 	width: 40px;
 }
 
+.pagination {
+	display: flex;
+	flex-direction: row;
+}
+
+.pagination input {
+	flex: 1;
+}
+
 @media (prefers-color-scheme: light) {
 	:root {
 		color: #213547;

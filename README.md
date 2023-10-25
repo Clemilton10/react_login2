@@ -327,7 +327,7 @@ const MySQL = {
 		let t = new Date().getTime();
 		let tx = `${vid}.${t}`.toString();
 		let hash = sha1(md5(convertToHex(tx)));
-		let expiration = t + 10;
+		let expiration = t + 180;
 		/*let hash = jwt.sign({ id: id }, '@rangel#', {
 			expiresIn: time
 		});*/
@@ -506,69 +506,88 @@ app.post('/validate', async (req, res) => {
 });
 
 app.post('/renew', async (req, res) => {
-	let tkid = await MySQL.getTokenId(req);
-	let t = new Date().getTime();
-	let del = t - 20;
+	try {
+		let tkid = await MySQL.getTokenId(req);
+		let t = new Date().getTime();
+		let del = t - 360;
 
-	//not valid id
-	if (tkid < 0) {
-		let { id } = await req.body;
-		if (id) {
-			tkid = id;
+		//not valid id
+		if (tkid < 0) {
+			let { id } = await req.body;
+			if (id) {
+				tkid = id;
+			}
 		}
-	}
 
-	//valid id
-	if (tkid > 0) {
-		let hs = await MySQL.getTokenHash(req);
-		//geting valid/active hash
-		let r = await MySQL.get(
-			'SELECT `user`,`passwd`,`hash` FROM `users` WHERE `id`=? AND `hash`=?',
-			[tkid, hs]
-		);
-		//error
-		if (r.status_id < 0) {
-			res.json(r);
-			return;
-			//not error
-		} else {
-			//found
-			if (r.rows.length > 0) {
-				if (r.rows[0].hash) {
-					let expiration = t + 10;
+		//valid id
+		if (tkid > 0) {
+			let hs = await MySQL.getTokenHash(req);
+			//geting valid/active hash
+			let r = await MySQL.get(
+				'SELECT `user`,`passwd`,`hash` FROM `users` WHERE `id`=? OR `hash`=?',
+				[tkid, hs]
+			);
+			//error
+			if (r.status_id < 0) {
+				res.json(r);
+				return;
+				//not error
+			} else {
+				//found
+				if (r.rows.length > 0) {
+					if (r.rows[0].hash) {
+						let expiration = t + 180;
 
-					//updating hash expiration
-					await MySQL.exec(
-						'UPDATE `users` SET `expiration`=? WHERE `id`=?',
-						[expiration, tkid]
-					);
+						//updating hash expiration
+						try {
+							await MySQL.exec(
+								'UPDATE `users` SET `expiration`=? WHERE `id`=?',
+								[expiration, tkid]
+							);
+						} catch (err1) {
+							res.json({ status_id: -1, status: 'error' });
+							return;
+						}
 
-					//deleting expired hash
-					await MySQL.exec(
-						'UPDATE `users` SET `hash`=? WHERE `expiration`<?',
-						['', del]
-					);
+						//deleting expired hash
+						try {
+							await MySQL.exec(
+								'UPDATE `users` SET `hash`=? WHERE `expiration`<?',
+								['', del]
+							);
+						} catch (err2) {
+							res.json({ status_id: -1, status: 'error' });
+							return;
+						}
 
-					res.json({
-						status_id: 1,
-						status: 'success',
-						id: r.rows[0].id,
-						user: r.rows[0].user,
-						token: r.rows[0].hash
-					});
-					return;
-				} else {
-					//
+						res.json({
+							status_id: 1,
+							status: 'success',
+							id: r.rows[0].id,
+							user: r.rows[0].user,
+							token: r.rows[0].hash
+						});
+						return;
+					} else {
+						//
+					}
 				}
 			}
 		}
+	} catch (er1) {
+		res.json({ status_id: -1, status: 'error' });
+		return;
 	}
-
-	//deleting expired hash
-	await MySQL.exec('UPDATE `users` SET `hash`=? WHERE `expiration`<?', [
-		'',
-		del
-	]);
+	try {
+		//deleting expired hash
+		await MySQL.exec('UPDATE `users` SET `hash`=? WHERE `expiration`<?', [
+			'',
+			del
+		]);
+	} catch (er2) {
+		res.json({ status_id: -1, status: 'error' });
+		return;
+	}
 	res.json({ status_id: -1, status: 'error' });
 	return;
 });
@@ -707,7 +726,7 @@ app.delete('/user/:id', MySQL.verifyToken, async (req, res) => {
 });
 
 app.listen(99, () => {
-	console.log('rodando na porta 99');
+	console.log('❱ rodando na porta 99');
 	return;
 });
 ```

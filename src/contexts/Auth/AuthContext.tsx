@@ -17,5 +17,6 @@ export type AuthContextType = {
 		meaning: string,
 		limit: string
 	) => Promise<object>;
+	startToken: () => Promise<boolean>;
 };
 export const AuthContext = createContext<AuthContextType>(null!);
