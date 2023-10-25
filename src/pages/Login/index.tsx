@@ -1,6 +1,7 @@
 import { ChangeEvent, useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../../contexts/Auth/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { Data } from '../../types/User';
 
 export const Login = () => {
 	const auth = useContext(AuthContext);
@@ -26,11 +27,11 @@ export const Login = () => {
 
 	const handleLogin = async () => {
 		if (user_ && password) {
-			const isLogged = await auth.signin(user_, password);
-			if (isLogged) {
+			const r: Data = await auth.signin(user_, password);
+			if (r && r.status_id == 1) {
 				navigate('/private');
 			} else {
-				alert('Não deu certo!');
+				alert(r.status);
 			}
 		}
 	};

@@ -1,5 +1,6 @@
 import { useContext, useState } from 'react';
 import { AuthContext } from '../../contexts/Auth/AuthContext';
+import { Data } from '../../types/User';
 
 const Private = () => {
 	const auth = useContext(AuthContext);
@@ -24,38 +25,8 @@ const Private = () => {
 	];
 	const meanings = ['ASC', 'DESC'];
 
-	const handleSubmit = async () => {
-		if (user_) {
-			let r;
-			if (action == 'save') {
-				if (password) {
-					r = await auth.userAdd(user_, password);
-				}
-			} else if (action == 'edit') {
-				r = await auth.userEdi(Number(id), user_, password);
-			} else {
-				r = await auth.userDel(Number(id));
-			}
-			console.log(r);
-			if (r && r.status_id) {
-				if (r.status_id < 0) {
-					if (r.status_id == -3) {
-						window.location.href = window.location.href;
-					} else {
-						alert('Houve algum erro');
-					}
-				} else {
-					alert('Salvo!');
-					handleClear();
-				}
-			} else {
-				alert('Houve algum erro');
-			}
-		}
-	};
-
 	const handleSearch = async () => {
-		const r = await auth.userGet(
+		const r: Data = await auth.userGet(
 			'`id`,`user`,`dt_registration`,`dt_update`,`publisher_id`',
 			search,
 			dt_ini,
@@ -85,6 +56,39 @@ const Private = () => {
 		setId('-1');
 		setUser_('');
 		setPassword('');
+	};
+	const restSubmit = (r: Data) => {
+		if (r.status_id) {
+			if (r.status_id < 0) {
+				if (r.status_id == -3) {
+					window.location.href = window.location.href;
+				} else {
+					alert('Houve algum erro');
+				}
+			} else {
+				alert('Salvo!');
+				handleClear();
+			}
+		} else {
+			alert('Houve algum erro');
+			console.log(r.status);
+		}
+	};
+	const handleSubmit = async () => {
+		if (user_) {
+			if (action == 'save') {
+				if (password) {
+					const r: Data = await auth.userAdd(user_, password);
+					restSubmit(r);
+				}
+			} else if (action == 'edit') {
+				const r: Data = await auth.userEdi(Number(id), user_, password);
+				restSubmit(r);
+			} else {
+				const r: Data = await auth.userDel(Number(id));
+				restSubmit(r);
+			}
+		}
 	};
 
 	const handleEdit = (x: number) => {
@@ -179,23 +183,30 @@ const Private = () => {
 				width={1024}
 				className="table"
 			>
-				{user_list.map((l: any, i: number) => (
-					<tr key={i}>
-						<td className="delete" onClick={() => handleDelete(i)}>
-							x
-						</td>
-						<td onClick={() => handleEdit(i)}>{l.id}</td>
-						<td onClick={() => handleEdit(i)}>{l.user}</td>
-						<td onClick={() => handleEdit(i)}>
-							{l.dt_registration}
-						</td>
-						<td onClick={() => handleEdit(i)}>{l.dt_update}</td>
-						<td onClick={() => handleEdit(i)}>{l.publisher_id}</td>
-						<td className="edit" onClick={() => handleEdit(i)}>
-							//
-						</td>
-					</tr>
-				))}
+				<tbody>
+					{user_list.map((l: any, i: number) => (
+						<tr key={i}>
+							<td
+								className="delete"
+								onClick={() => handleDelete(i)}
+							>
+								x
+							</td>
+							<td onClick={() => handleEdit(i)}>{l.id}</td>
+							<td onClick={() => handleEdit(i)}>{l.user}</td>
+							<td onClick={() => handleEdit(i)}>
+								{l.dt_registration}
+							</td>
+							<td onClick={() => handleEdit(i)}>{l.dt_update}</td>
+							<td onClick={() => handleEdit(i)}>
+								{l.publisher_id}
+							</td>
+							<td className="edit" onClick={() => handleEdit(i)}>
+								//
+							</td>
+						</tr>
+					))}
+				</tbody>
 			</table>
 		</>
 	);

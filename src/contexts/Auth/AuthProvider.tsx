@@ -1,13 +1,16 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { AuthContext } from './AuthContext';
-import { User } from '../../types/User';
+import { Data, User } from '../../types/User';
 import { useApi } from '../../hooks/useApi';
 
 export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 	const [user_, setUser_] = useState<User | null>(null);
 	const api = useApi();
-	const signin = async (vuser_: string, vpassword: string) => {
-		const data = await api.signin(vuser_, vpassword);
+	const signin = async (
+		vuser_: string,
+		vpassword: string
+	): Promise<object> => {
+		const data: Data = await api.signin(vuser_, vpassword);
 		if (data && data.status_id == 1) {
 			if (data.user && data.token) {
 				setUser_({
@@ -15,24 +18,31 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 					user_: vuser_,
 					password: vpassword
 				});
-				saveLocalStorage(data.token, data.id, data.user);
+				if (!isNaN(Number(data.id))) {
+					saveLocalStorage(data.token, Number(data.id), data.user);
+				}
 			}
-			return true;
-		} else {
-			return false;
 		}
+		return data;
 	};
-	const userAdd = async (vuser_: string, vpassword: string) => {
+	const userAdd = async (
+		vuser_: string,
+		vpassword: string
+	): Promise<object> => {
 		const id = localStorage.getItem('id');
 		const data = await api.userAdd(vuser_, vpassword, Number(id));
 		return data;
 	};
-	const userEdi = async (vid: number, vuser_: string, vpassword: string) => {
+	const userEdi = async (
+		vid: number,
+		vuser_: string,
+		vpassword: string
+	): Promise<object> => {
 		const id = localStorage.getItem('id');
 		const data = await api.userEdi(vid, vuser_, vpassword, Number(id));
 		return data;
 	};
-	const userDel = async (vid: number) => {
+	const userDel = async (vid: number): Promise<object> => {
 		const data = await api.userDel(vid);
 		return data;
 	};
@@ -44,7 +54,7 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 		order: string,
 		meaning: string,
 		limit: string
-	) => {
+	): Promise<object> => {
 		const data = await api.userGet(
 			fields,
 			search,
@@ -71,21 +81,40 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
 		localStorage.removeItem('id');
 	};
 	useEffect(() => {
-		const validadeToken = async () => {
-			const tk = localStorage.getItem('authToken');
-			if (tk) {
-				const data = await api.validateToken(tk);
-				if (data && data.status_id == 1 && data.user) {
-					setUser_({
-						id: data.id,
-						user_: data.user,
-						password: '***'
-					});
+		const start = async () => {
+			const validadeToken = async (): Promise<boolean> => {
+				const tk = localStorage.getItem('authToken');
+				if (tk) {
+					const data: Data = await api.validateToken(tk);
+					if (data && data.status_id == 1 && data.user) {
+						setUser_({
+							id: data.id,
+							user_: data.user
+						});
+						return true;
+					}
 				}
-			}
+				return false;
+			};
+			const renewToken = async (): Promise<boolean> => {
+				const tk = localStorage.getItem('authToken');
+				const id = localStorage.getItem('id');
+				if (tk) {
+					if (!isNaN(Number(id))) {
+						const data: Data = await api.renewToken(tk, Number(id));
+						if (data && data.status_id == 1 && data.user) {
+							setTimeout(renewToken, 10000);
+							return true;
+						}
+					}
+				}
+				return false;
+			};
+			let t = await validadeToken();
+			t = await renewToken();
 			return true;
 		};
-		validadeToken();
+		let s = start();
 	}, []);
 	return (
 		<AuthContext.Provider

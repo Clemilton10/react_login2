@@ -4,7 +4,7 @@ const api = axios.create({
 	baseURL: 'http://localhost:99'
 });
 export const useApi = () => ({
-	validateToken: async (vtoken: string) => {
+	validateToken: async (vtoken: string): Promise<object> => {
 		api.defaults.headers.common['Authorization'] = vtoken
 			? `Bearer ${vtoken}`
 			: '';
@@ -17,7 +17,14 @@ export const useApi = () => ({
 			: -1;
 		return response.data;
 	},
-	signin: async (vuser_: string, vpassword: string) => {
+	renewToken: async (vtoken: string, vid: number): Promise<object> => {
+		api.defaults.headers.common['Authorization'] = vtoken
+			? `Bearer ${vtoken}`
+			: '';
+		const response = await api.post('/renew', { id: vid });
+		return response.data;
+	},
+	signin: async (vuser_: string, vpassword: string): Promise<object> => {
 		const response = await api.post('/signin', {
 			user: vuser_,
 			password: vpassword
@@ -36,7 +43,7 @@ export const useApi = () => ({
 			: -1;
 		return response.data;
 	},
-	signout: async () => {
+	signout: async (): Promise<object> => {
 		const response = await api.post('/signout', {
 			id: api.defaults.headers.common['id']
 		});
@@ -51,7 +58,7 @@ export const useApi = () => ({
 		vuser_: string,
 		vpassword: string,
 		vpublisher_id: number
-	) => {
+	): Promise<object> => {
 		const response = await api.post('/user', {
 			user: vuser_,
 			password: vpassword,
@@ -64,7 +71,7 @@ export const useApi = () => ({
 		vuser_: string,
 		vpassword: string,
 		vpublisher_id: number
-	) => {
+	): Promise<object> => {
 		const response = await api.put('/user', {
 			id: vid,
 			user: vuser_,
@@ -73,7 +80,7 @@ export const useApi = () => ({
 		});
 		return response.data;
 	},
-	userDel: async (vid: number) => {
+	userDel: async (vid: number): Promise<object> => {
 		const response = await api.delete(`/user/${vid}`);
 		return response.data;
 	},
@@ -85,7 +92,7 @@ export const useApi = () => ({
 		order: string,
 		meaning: string,
 		limit: string
-	) => {
+	): Promise<object> => {
 		const response = await api.post('/user/get', {
 			fields: fields,
 			search: search,
